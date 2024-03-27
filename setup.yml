@@ -1,0 +1,102 @@
+---
+  - name: "Setup local device"
+    hosts: localhost
+    connection: local
+    tasks:
+      - name: "Upgrade all packages"
+        dnf:
+          name: "*"
+          state: latest
+        become: true
+
+      - name: "Asus specific setup"
+        block:
+          - name: "Enable nonfree rpm fusion"
+            dnf:
+              name: "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ansible_distribution_major_version}}.noarch.rpm,https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ansible_distribution_major_version}}.noarch.rpm"
+              state: present
+
+          - name: "Install evil Nvidia drivers"
+            dnf:
+              name:
+                - kernel-devel
+                - akmod-nvidia
+                - xorg-x11-drv-nvidia-cuda
+ 
+          - name: "Enable Nvidia services"
+            systemd:
+              name: '{{ item }}.service'
+              enabled: true
+            with_items:
+              - nvidia-hibernate
+              - nvidia-suspend
+              - nvidia-resume
+              - nvidia-powerd
+
+          - name: "Add asus linux copr"
+            command: 
+              cmd: dnf copr enable -y lukenukem/asus-linux
+              creates: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:lukenukem:asus-linux.repo
+
+          - name: "Install asusctl"
+            dnf:
+              name:
+                - asusctl
+                - supergfxctl
+                - asusctl-rog-gui
+              state: latest
+
+          - name: "Enable supergfxctl"
+            systemd:
+              name: supergfxd
+              state: started
+              enabled: true
+
+        become: true
+        when: ansible_facts['board_name'] == 'GA402XI'
+
+
+      - name: "Install software"
+        block:
+        - name: "Enable Microsoft packages"
+          dnf:
+            name: "https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm"
+            state: present
+
+        - name: "Enable lazygit copr"
+          command:
+            cmd: dnf copr enable -y atim/lazygit
+            creates: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:atim:lazygit.repo
+
+        - name: "Enable docker repo"
+          command:
+            cmd: dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+            creates: /etc/yum.repos.d/docker-ce.repo
+
+        - name: "Install software"
+          dnf:
+            name:
+              - neovim
+              - python3-neovim
+              - vim
+              - "@development-tools"
+              - make
+              - automake
+              - gcc
+              - gcc-c++
+              - kernel-devel
+              - azure-cli
+              - kubectl
+              - fzf
+              - htop
+              - wireguard-tools
+              - lazygit
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+        become: true
+
+
